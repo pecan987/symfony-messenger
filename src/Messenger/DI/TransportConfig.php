@@ -18,7 +18,8 @@ final class TransportConfig
     /** @var array<string, mixed> */
     public array $options = [];
 
-    public ?RetryStrategyConfig $retryStrategy = null;
+    /** @var RetryStrategyConfig|null */
+    public $retryStrategy;
 
     /**
      * Service/class used as serializer for given transport. When null is passed, default serializer will be used.
