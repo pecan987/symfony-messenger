@@ -33,6 +33,7 @@ use Symfony\Component\Messenger\Handler\MessageSubscriberInterface;
 use Symfony\Component\Messenger\MessageBus;
 use Symfony\Component\Messenger\Middleware\HandleMessageMiddleware;
 use Symfony\Component\Messenger\Middleware\SendMessageMiddleware;
+use Symfony\Component\Messenger\Retry\MultiplierRetryStrategy;
 use Symfony\Component\Messenger\RoutableMessageBus;
 use Symfony\Component\Messenger\Transport\InMemoryTransportFactory;
 use Symfony\Component\Messenger\Transport\Serialization\SerializerInterface;
@@ -282,15 +283,34 @@ class MessengerExtension extends CompilerExtension
             if (is_string($transportConfig)) {
                 $dsn        = $transportConfig;
                 $options    = [];
+                $retryStrategy = new RetryStrategyConfig();
                 $serializer = $defaultSerializer;
             } else {
                 $dsn        = $transportConfig->dsn;
                 $options    = $transportConfig->options;
+                $retryStrategy = $transportConfig->retryStrategy ?? new RetryStrategyConfig();
                 $serializer = $transportConfig->serializer !== null
                     ? $builder->addDefinition($this->prefix('serializer.' . $transportName))
                         ->setType(SerializerInterface::class)
                         ->setFactory($transportConfig->serializer)
                     : $defaultSerializer;
+            }
+
+            $retryStrategyService = $builder->addDefinition($this->prefix('transport.' . $transportName . '.retryStrategy'))
+                ->setTags([self::TAG_RETRY_STRATEGY => $transportName]);
+
+            if ($retryStrategy->service !== null) {
+                $retryStrategyService->setFactory($retryStrategy->service);
+            } else {
+                $retryStrategyService->setFactory(
+                    MultiplierRetryStrategy::class,
+                    [
+                        $retryStrategy->maxRetries,
+                        $retryStrategy->delay,
+                        $retryStrategy->multiplier,
+                        $retryStrategy->maxDelay,
+                    ]
+                );
             }
 
             $transportServiceName = $this->prefix('transport.' . $transportName);
